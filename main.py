@@ -60,30 +60,6 @@ def _load_icon() -> QIcon:
         return QIcon(icon_path)
     return _generate_icon()
 
-# ---------------------------------------------------------------------------
-# Événement générique pour appeler une fonction depuis le thread principal Qt
-# ---------------------------------------------------------------------------
-
-_FUNCTION_CALL_EVENT_TYPE = QEvent.registerEventType()
-
-
-class _FunctionCallEvent(QEvent):
-    """Événement permettant d'appeler une fonction dans le thread Qt principal."""
-
-    def __init__(self, func):
-        super().__init__(QEvent.Type(_FUNCTION_CALL_EVENT_TYPE))
-        self.func = func
-
-
-class _EventFilter(QObject):
-    """Filtre d'événements qui exécute les _FunctionCallEvent. Hérite de QObject."""
-
-    def eventFilter(self, obj, event):
-        if event.type() == _FUNCTION_CALL_EVENT_TYPE:
-            event.func()
-            return True
-        return super().eventFilter(obj, event)
-
 
 class CursorApp:
     """
@@ -176,6 +152,7 @@ class CursorApp:
         """Appelé quand les paramètres changent dans le panneau."""
         self.config.update(config)
         self.overlay.update_config(self.config)
+        # Mise à jour de l'opacité de la fenêtre overlay
         opacity = self.config.get("opacity", 100) / 100.0
         self.overlay.setWindowOpacity(opacity)
         save_config(self.config)
@@ -225,6 +202,7 @@ class CursorApp:
 
     # ------------------------------------------------------------------
     # Callbacks hotkeys (appelés depuis le thread pynput)
+    # Les appels Qt doivent être thread-safe via invokeMethod.
     # ------------------------------------------------------------------
 
     def _hotkey_move(self, dx: int, dy: int) -> None:
@@ -244,6 +222,7 @@ class CursorApp:
         )
 
     def _hotkey_toggle_settings(self) -> None:
+        # _toggle_settings n'est pas un slot Qt, on passe par un lambda dans le thread principal
         self.app.postEvent(self.overlay, _FunctionCallEvent(self._toggle_settings))
 
     def _hotkey_toggle_crosshair(self) -> None:
@@ -254,16 +233,42 @@ class CursorApp:
 
 
 # ---------------------------------------------------------------------------
+# Événement générique pour appeler une fonction depuis le thread principal Qt
+# ---------------------------------------------------------------------------
+
+_FUNCTION_CALL_EVENT_TYPE = QEvent.registerEventType()
+
+
+class _FunctionCallEvent(QEvent):
+    """Événement permettant d'appeler une fonction dans le thread Qt principal."""
+
+    def __init__(self, func):
+        super().__init__(QEvent.Type(_FUNCTION_CALL_EVENT_TYPE))
+        self.func = func
+
+
+class _EventFilter(QObject):
+    """Filtre d'événements qui exécute les _FunctionCallEvent. Hérite de QObject."""
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        if event.type() == _FUNCTION_CALL_EVENT_TYPE:
+            event.func()
+            return True
+        return super().eventFilter(obj, event)
+
+
+# ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     """Lance l'application Cursor."""
+    # Nécessaire pour les systèmes à haute densité de pixels (HiDPI)
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)
+    app.setQuitOnLastWindowClosed(False)  # Ne pas quitter si le panneau est fermé
 
     if not QSystemTrayIcon.isSystemTrayAvailable():
         print("[Cursor] Avertissement : system tray non disponible.")
