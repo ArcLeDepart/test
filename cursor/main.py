@@ -106,6 +106,8 @@ class CursorApp:
             on_toggle_settings=self._hotkey_toggle_settings,
             on_toggle_crosshair=self._hotkey_toggle_crosshair,
             on_quit=self._hotkey_quit,
+            on_set_position=self._hotkey_set_position,
+            on_toggle_mouse_mode=self._hotkey_toggle_mouse_mode,
         )
 
         self.icon = _load_icon()
@@ -242,6 +244,36 @@ class CursorApp:
             "center_crosshair",
             Qt.QueuedConnection,
         )
+
+    def _hotkey_set_position(self, x: int, y: int) -> None:
+        """Positionne le crosshair à une position absolue (mode souris)."""
+        def _do():
+            self.config["position_x"] = x
+            self.config["position_y"] = y
+            self.overlay.update_config(self.config)
+        self.app.postEvent(self.overlay, _FunctionCallEvent(_do))
+
+    def _hotkey_toggle_mouse_mode(self, active: bool) -> None:
+        """Appelé quand le mode souris est activé/désactivé."""
+        def _do():
+            if active:
+                self.tray.showMessage(
+                    "Cursor",
+                    "🖱 Mode souris ACTIVÉ — Bougez la souris pour déplacer le crosshair.
+Ctrl+Alt+M pour désactiver.",
+                    QSystemTrayIcon.Information,
+                    2000,
+                )
+            else:
+                # Sauvegarder la position actuelle
+                save_config(self.config)
+                self.tray.showMessage(
+                    "Cursor",
+                    "🔒 Mode souris DÉSACTIVÉ — Crosshair verrouillé.",
+                    QSystemTrayIcon.Information,
+                    2000,
+                )
+        self.app.postEvent(self.overlay, _FunctionCallEvent(_do))
 
     def _hotkey_toggle_settings(self) -> None:
         self.app.postEvent(self.overlay, _FunctionCallEvent(self._toggle_settings))
