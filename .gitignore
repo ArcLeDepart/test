@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# PyInstaller build artifacts
+cursor/build/
+cursor/dist/
+cursor/*.spec
+*.spec
+
+# Configuration locale générée à l'exécution
+cursor_config.json
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
