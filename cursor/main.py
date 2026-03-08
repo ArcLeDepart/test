@@ -8,7 +8,7 @@ Intègre une icône dans le system tray.
 import os
 import sys
 
-from PyQt5.QtCore import QEvent, QMetaObject, Qt, Q_ARG
+from PyQt5.QtCore import QEvent, QMetaObject, QObject, Qt, Q_ARG
 from PyQt5.QtGui import QColor, QIcon, QPainter, QPixmap
 from PyQt5.QtWidgets import QAction, QApplication, QMenu, QSystemTrayIcon
 
@@ -16,7 +16,6 @@ from config import DEFAULT_CONFIG, load_config, save_config
 from crosshair_overlay import CrosshairOverlay
 from hotkey_manager import HotkeyManager
 from settings_panel import SettingsPanel
-
 
 def _generate_icon(size: int = 32) -> QIcon:
     """
@@ -49,7 +48,6 @@ def _generate_icon(size: int = 32) -> QIcon:
     painter.end()
     return QIcon(pixmap)
 
-
 def _load_icon() -> QIcon:
     """Charge l'icône depuis le dossier assets ou génère une icône de secours."""
     if getattr(sys, "frozen", False):
@@ -61,6 +59,30 @@ def _load_icon() -> QIcon:
     if os.path.exists(icon_path):
         return QIcon(icon_path)
     return _generate_icon()
+
+# ---------------------------------------------------------------------------
+# Événement générique pour appeler une fonction depuis le thread principal Qt
+# ---------------------------------------------------------------------------
+
+_FUNCTION_CALL_EVENT_TYPE = QEvent.registerEventType()
+
+
+class _FunctionCallEvent(QEvent):
+    """Événement permettant d'appeler une fonction dans le thread Qt principal."""
+
+    def __init__(self, func):
+        super().__init__(QEvent.Type(_FUNCTION_CALL_EVENT_TYPE))
+        self.func = func
+
+
+class _EventFilter(QObject):
+    """Filtre d'événements qui exécute les _FunctionCallEvent. Hérite de QObject."""
+
+    def eventFilter(self, obj, event):
+        if event.type() == _FUNCTION_CALL_EVENT_TYPE:
+            event.func()
+            return True
+        return super().eventFilter(obj, event)
 
 
 class CursorApp:
@@ -154,7 +176,6 @@ class CursorApp:
         """Appelé quand les paramètres changent dans le panneau."""
         self.config.update(config)
         self.overlay.update_config(self.config)
-        # Mise à jour de l'opacité de la fenêtre overlay
         opacity = self.config.get("opacity", 100) / 100.0
         self.overlay.setWindowOpacity(opacity)
         save_config(self.config)
@@ -204,7 +225,6 @@ class CursorApp:
 
     # ------------------------------------------------------------------
     # Callbacks hotkeys (appelés depuis le thread pynput)
-    # Les appels Qt doivent être thread-safe via invokeMethod.
     # ------------------------------------------------------------------
 
     def _hotkey_move(self, dx: int, dy: int) -> None:
@@ -224,7 +244,6 @@ class CursorApp:
         )
 
     def _hotkey_toggle_settings(self) -> None:
-        # _toggle_settings n'est pas un slot Qt, on passe par un lambda dans le thread principal
         self.app.postEvent(self.overlay, _FunctionCallEvent(self._toggle_settings))
 
     def _hotkey_toggle_crosshair(self) -> None:
@@ -235,42 +254,16 @@ class CursorApp:
 
 
 # ---------------------------------------------------------------------------
-# Événement générique pour appeler une fonction depuis le thread principal Qt
-# ---------------------------------------------------------------------------
-
-_FUNCTION_CALL_EVENT_TYPE = QEvent.registerEventType()
-
-
-class _FunctionCallEvent(QEvent):
-    """Événement permettant d'appeler une fonction dans le thread Qt principal."""
-
-    def __init__(self, func):
-        super().__init__(QEvent.Type(_FUNCTION_CALL_EVENT_TYPE))
-        self.func = func
-
-
-class _EventFilter:
-    """Filtre d'événements qui exécute les _FunctionCallEvent."""
-
-    def eventFilter(self, obj, event):  # noqa: N802
-        if event.type() == _FUNCTION_CALL_EVENT_TYPE:
-            event.func()
-            return True
-        return False
-
-
-# ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     """Lance l'application Cursor."""
-    # Nécessaire pour les systèmes à haute densité de pixels (HiDPI)
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)  # Ne pas quitter si le panneau est fermé
+    app.setQuitOnLastWindowClosed(False)
 
     if not QSystemTrayIcon.isSystemTrayAvailable():
         print("[Cursor] Avertissement : system tray non disponible.")
@@ -278,8 +271,8 @@ def main() -> None:
     cursor_app = CursorApp(app)
 
     # Filtre d'événements pour les appels thread-safe
-    event_filter = _EventFilter()
-    app.installEventFilter(event_filter)  # type: ignore[arg-type]
+    event_filter = _EventFilter(parent=app)
+    app.installEventFilter(event_filter)
 
     sys.exit(app.exec_())
 
