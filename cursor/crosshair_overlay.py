@@ -220,6 +220,39 @@ class CrosshairOverlay(QWidget):
         return self._visible
 
     # ------------------------------------------------------------------
+    # Mode verrouillage (lock) — click-through total
+    # ------------------------------------------------------------------
+
+    def set_locked(self, locked: bool) -> None:
+        """
+        Active/désactive le mode verrouillé.
+
+        En mode verrouillé l'overlay est totalement transparent aux entrées
+        (click-through au niveau Windows) et ne perturbe pas le jeu.
+        """
+        self._locked = locked
+        if locked:
+            self.setWindowFlags(
+                Qt.WindowStaysOnTopHint
+                | Qt.FramelessWindowHint
+                | Qt.Tool
+                | Qt.WindowTransparentForInput
+            )
+        else:
+            self.setWindowFlags(
+                Qt.WindowStaysOnTopHint
+                | Qt.FramelessWindowHint
+                | Qt.Tool
+            )
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.show()  # Re-show requis après changement de flags
+
+    def is_locked(self) -> bool:
+        """Retourne True si l'overlay est verrouillé."""
+        return getattr(self, '_locked', False)
+
+    # ------------------------------------------------------------------
     # Déplacement du crosshair
     # ------------------------------------------------------------------
 

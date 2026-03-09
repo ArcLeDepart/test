@@ -100,6 +100,8 @@ Tous les raccourcis fonctionnent même quand l'application n'est **pas** au prem
 |-----------|--------|
 | `Ctrl+Alt+↑↓←→` | Déplace le crosshair de **1 pixel** |
 | `Ctrl+Alt+Shift+↑↓←→` | Déplace le crosshair de **10 pixels** |
+| `Ctrl+Alt+M` | **déplace** le crosshair avec la souris |
+| `Ctrl+Alt+L` | **lock** / **unlock** le crosshair |
 | `Ctrl+Alt+C` | **Centre** le crosshair sur l'écran |
 | `Ctrl+Alt+S` | **Affiche/cache** le panneau de paramètres |
 | `Ctrl+Alt+H` | **Affiche/cache** le crosshair |

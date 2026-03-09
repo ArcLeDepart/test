@@ -9,6 +9,9 @@ Raccourcis disponibles :
     Ctrl+Alt+C               : Centre le crosshair
     Ctrl+Alt+S               : Affiche/cache le panneau de configuration
     Ctrl+Alt+H               : Affiche/cache le crosshair
+    Ctrl+Alt+L               : Verrouille/déverrouille l'overlay (click-through total)
+    Ctrl+Alt+↑               : Augmenter la taille du crosshair
+    Ctrl+Alt+↓               : Diminuer la taille du crosshair
     Ctrl+Alt+Q               : Quitte l'application
 """
 
@@ -35,6 +38,8 @@ class HotkeyManager:
         on_quit: Callable[[], None],
         on_set_position: Optional[Callable[[int, int], None]] = None,
         on_toggle_mouse_mode: Optional[Callable[[bool], None]] = None,
+        on_toggle_lock: Optional[Callable[[], None]] = None,
+        on_change_size: Optional[Callable[[int], None]] = None,
     ):
         """
         Initialise le gestionnaire de raccourcis.
@@ -47,6 +52,8 @@ class HotkeyManager:
             on_quit              : Callback() pour quitter l'application
             on_set_position      : Callback(x, y) pour positionner le crosshair (absolu)
             on_toggle_mouse_mode : Callback(active) appelé quand le mode souris change
+            on_toggle_lock       : Callback() pour verrouiller/déverrouiller l'overlay
+            on_change_size       : Callback(delta) pour changer la taille du crosshair
         """
         self.on_move = on_move
         self.on_center = on_center
@@ -55,6 +62,8 @@ class HotkeyManager:
         self.on_quit = on_quit
         self.on_set_position = on_set_position
         self.on_toggle_mouse_mode = on_toggle_mouse_mode
+        self.on_toggle_lock = on_toggle_lock
+        self.on_change_size = on_change_size
 
         # État du mode déplacement souris
         self._mouse_mode = False
@@ -132,7 +141,15 @@ class HotkeyManager:
             return key.name
         except AttributeError:
             try:
-                return key.char.lower() if key.char else None
+                # key.char is None when Ctrl+Alt are held on Windows
+                if key.char:
+                    return key.char.lower()
+                # Fallback: use virtual key code to get the letter
+                if hasattr(key, 'vk') and key.vk is not None:
+                    # vk codes 65-90 map to 'a'-'z'
+                    if 65 <= key.vk <= 90:
+                        return chr(key.vk).lower()
+                return None
             except AttributeError:
                 return None
 
@@ -188,6 +205,21 @@ class HotkeyManager:
         # Afficher/cacher le crosshair
         elif last_key == "h":
             self.on_toggle_crosshair()
+
+        # Verrouiller/déverrouiller l'overlay
+        elif last_key == "l":
+            if self.on_toggle_lock:
+                self.on_toggle_lock()
+
+        # Augmenter la taille du crosshair
+        elif last_key == "up":
+            if self.on_change_size:
+                self.on_change_size(2)
+
+        # Diminuer la taille du crosshair
+        elif last_key == "down":
+            if self.on_change_size:
+                self.on_change_size(-2)
 
         # Quitter
         elif last_key == "q":

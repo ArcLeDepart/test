@@ -108,6 +108,8 @@ class CursorApp:
             on_quit=self._hotkey_quit,
             on_set_position=self._hotkey_set_position,
             on_toggle_mouse_mode=self._hotkey_toggle_mouse_mode,
+            on_toggle_lock=self._hotkey_toggle_lock,
+            on_change_size=self._hotkey_change_size,
         )
 
         self.icon = _load_icon()
@@ -259,8 +261,7 @@ class CursorApp:
             if active:
                 self.tray.showMessage(
                     "Cursor",
-                    "🖱 Mode souris ACTIVÉ — Bougez la souris pour déplacer le crosshair.
-Ctrl+Alt+M pour désactiver.",
+                    "🖱 Mode souris ACTIVÉ — Bougez la souris pour déplacer le crosshair.\nCtrl+Alt+M pour désactiver.",
                     QSystemTrayIcon.Information,
                     2000,
                 )
@@ -273,6 +274,42 @@ Ctrl+Alt+M pour désactiver.",
                     QSystemTrayIcon.Information,
                     2000,
                 )
+        self.app.postEvent(self.overlay, _FunctionCallEvent(_do))
+
+    def _hotkey_toggle_lock(self) -> None:
+        def _do():
+            locked = not self.overlay.is_locked()
+            self.overlay.set_locked(locked)
+            if locked:
+                self.tray.showMessage(
+                    "Cursor",
+                    "🔒 Overlay VERROUILLÉ — Click-through total, le jeu n'est plus affecté.",
+                    QSystemTrayIcon.Information,
+                    2000,
+                )
+            else:
+                self.tray.showMessage(
+                    "Cursor",
+                    "🔓 Overlay DÉVERROUILLÉ.",
+                    QSystemTrayIcon.Information,
+                    2000,
+                )
+        self.app.postEvent(self.overlay, _FunctionCallEvent(_do))
+
+    def _hotkey_change_size(self, delta: int) -> None:
+        def _do():
+            current = self.config.get("size", 20)
+            new_size = max(2, min(100, current + delta))
+            self.config["size"] = new_size
+            self.overlay.update_config(self.config)
+            self.settings.refresh_config(self.config)
+            save_config(self.config)
+            self.tray.showMessage(
+                "Cursor",
+                f"📏 Taille du crosshair : {new_size} px",
+                QSystemTrayIcon.Information,
+                1500,
+            )
         self.app.postEvent(self.overlay, _FunctionCallEvent(_do))
 
     def _hotkey_toggle_settings(self) -> None:
